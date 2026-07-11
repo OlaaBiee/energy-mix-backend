@@ -21,7 +21,7 @@ class EnergyControllerTest {
                 restTemplate.getForEntity("/api/test", String.class);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("Backend działa"));
+        assertTrue(response.getBody().contains("Backend is running"));
     }
 
     @Test
@@ -51,7 +51,7 @@ class EnergyControllerTest {
                 restTemplate.getForEntity("/api/charging-window?hours=0", String.class);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("Parametr hours musi"));
+        assertTrue(response.getBody().contains("Charging time must"));
     }
 
     @Test
@@ -60,6 +60,6 @@ class EnergyControllerTest {
                 restTemplate.getForEntity("/api/charging-window?hours=7", String.class);
 
         assertEquals(200, response.getStatusCode().value());
-        assertTrue(response.getBody().contains("Parametr hours musi"));
+        assertTrue(response.getBody().contains("Charging time must"));
     }
 }

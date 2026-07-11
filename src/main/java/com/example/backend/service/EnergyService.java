@@ -1,14 +1,17 @@
 package com.example.backend.service;
 
 import com.example.backend.client.CarbonIntensityClient;
+import com.example.backend.dto.ApiErrorDto;
+import com.example.backend.dto.ChargingWindowResponseDto;
+import com.example.backend.dto.EnergyMixResponseDto;
+import com.example.backend.dto.GenerationIntervalDto;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class EnergyService {
@@ -21,7 +24,7 @@ public class EnergyService {
         this.energyCalculator = energyCalculator;
     }
 
-    public Map<String, Object> getEnergyMix() {
+    public Object getEnergyMix() {
         ZoneId londonZone = ZoneId.of("Europe/London");
 
         LocalDate today = LocalDate.now(londonZone);
@@ -31,25 +34,27 @@ public class EnergyService {
         ZonedDateTime start = today.atStartOfDay(londonZone);
         ZonedDateTime end = today.plusDays(3).atStartOfDay(londonZone);
 
-        List<Map<String, Object>> intervals =
+        List<GenerationIntervalDto> intervals =
                 carbonIntensityClient.getGenerationData(start, end);
 
         if (intervals.isEmpty()) {
-            return createError("Brak danych z API");
+            return new ApiErrorDto("No data received from external API.");
         }
 
-        return energyCalculator.calculateDailyEnergyMix(
+        EnergyMixResponseDto response = energyCalculator.calculateDailyEnergyMix(
                 intervals,
                 today,
                 tomorrow,
                 dayAfterTomorrow,
                 londonZone
         );
+
+        return response;
     }
 
-    public Map<String, Object> getBestChargingWindow(int hours) {
+    public Object getBestChargingWindow(int hours) {
         if (hours < 1 || hours > 6) {
-            return createError("Parametr hours musi być liczbą całkowitą od 1 do 6.");
+            return new ApiErrorDto("Charging time must be a full number of hours from 1 to 6.");
         }
 
         ZoneId londonZone = ZoneId.of("Europe/London");
@@ -57,21 +62,21 @@ public class EnergyService {
         ZonedDateTime start = roundUpToNextHalfHour(ZonedDateTime.now(londonZone));
         ZonedDateTime end = start.plusDays(2);
 
-        List<Map<String, Object>> intervals =
+        List<GenerationIntervalDto> intervals =
                 carbonIntensityClient.getGenerationData(start, end);
 
         if (intervals.isEmpty()) {
-            return createError("Brak danych z API");
+            return new ApiErrorDto("No data received from external API.");
         }
 
-        List<Map<String, Object>> preparedIntervals =
-                energyCalculator.prepareChargingIntervals(intervals);
+        Optional<ChargingWindowResponseDto> chargingWindow =
+                energyCalculator.findBestChargingWindow(intervals, hours, londonZone);
 
-        return energyCalculator.findBestChargingWindow(
-                preparedIntervals,
-                hours,
-                londonZone
-        );
+        if (chargingWindow.isEmpty()) {
+            return new ApiErrorDto("No continuous charging window found.");
+        }
+
+        return chargingWindow.get();
     }
 
     private ZonedDateTime roundUpToNextHalfHour(ZonedDateTime dateTime) {
@@ -88,11 +93,5 @@ public class EnergyService {
         }
 
         return result.plusHours(1).withMinute(0);
-    }
-
-    private Map<String, Object> createError(String message) {
-        Map<String, Object> error = new LinkedHashMap<>();
-        error.put("message", message);
-        return error;
     }
 }

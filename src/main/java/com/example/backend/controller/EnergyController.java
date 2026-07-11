@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 @CrossOrigin(origins = "*")
 @RestController
 public class EnergyController {
@@ -20,16 +18,16 @@ public class EnergyController {
 
     @GetMapping("/api/test")
     public String test() {
-        return "Backend działa";
+        return "Backend is running";
     }
 
     @GetMapping("/api/energy-mix")
-    public Map<String, Object> getEnergyMix() {
+    public Object getEnergyMix() {
         return energyService.getEnergyMix();
     }
 
     @GetMapping("/api/charging-window")
-    public Map<String, Object> getBestChargingWindow(@RequestParam int hours) {
+    public Object getBestChargingWindow(@RequestParam int hours) {
         return energyService.getBestChargingWindow(hours);
     }
 }

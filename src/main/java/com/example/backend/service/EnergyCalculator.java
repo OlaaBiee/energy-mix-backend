@@ -1,5 +1,11 @@
 package com.example.backend.service;
 
+import com.example.backend.dto.ChargingWindowResponseDto;
+import com.example.backend.dto.DailyEnergyMixDto;
+import com.example.backend.dto.EnergyMixResponseDto;
+import com.example.backend.dto.GenerationIntervalDto;
+import com.example.backend.dto.GenerationMixDto;
+import com.example.backend.model.EnergySource;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -11,40 +17,30 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Component
 public class EnergyCalculator {
 
-    private static final List<String> CLEAN_ENERGY_SOURCES = List.of(
-            "biomass", "nuclear", "hydro", "wind", "solar"
-    );
+    private static final int INTERVALS_PER_HOUR = 2;
+    private static final double INITIAL_BEST_AVERAGE = -1.0;
+    private static final double ROUNDING_FACTOR = 100.0;
 
-    private static final List<String> ALL_ENERGY_SOURCES = List.of(
-            "biomass", "coal", "imports", "gas", "nuclear", "other", "hydro", "solar", "wind"
-    );
-
-    public List<String> getCleanEnergySources() {
-        return CLEAN_ENERGY_SOURCES;
-    }
-
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> calculateDailyEnergyMix(
-            List<Map<String, Object>> intervals,
+    public EnergyMixResponseDto calculateDailyEnergyMix(
+            List<GenerationIntervalDto> intervals,
             LocalDate today,
             LocalDate tomorrow,
             LocalDate dayAfterTomorrow,
             ZoneId londonZone
     ) {
-        Map<LocalDate, List<Map<String, Object>>> groupedByDate = new LinkedHashMap<>();
+        Map<LocalDate, List<GenerationIntervalDto>> groupedByDate = new LinkedHashMap<>();
 
         groupedByDate.put(today, new ArrayList<>());
         groupedByDate.put(tomorrow, new ArrayList<>());
         groupedByDate.put(dayAfterTomorrow, new ArrayList<>());
 
-        for (Map<String, Object> interval : intervals) {
-            String intervalFrom = (String) interval.get("from");
-
-            LocalDate intervalDate = OffsetDateTime.parse(intervalFrom)
+        for (GenerationIntervalDto interval : intervals) {
+            LocalDate intervalDate = OffsetDateTime.parse(interval.getFrom())
                     .atZoneSameInstant(londonZone)
                     .toLocalDate();
 
@@ -53,34 +49,30 @@ public class EnergyCalculator {
             }
         }
 
-        List<Map<String, Object>> days = new ArrayList<>();
+        List<DailyEnergyMixDto> days = new ArrayList<>();
 
-        for (Map.Entry<LocalDate, List<Map<String, Object>>> entry : groupedByDate.entrySet()) {
+        for (Map.Entry<LocalDate, List<GenerationIntervalDto>> entry : groupedByDate.entrySet()) {
             LocalDate date = entry.getKey();
-            List<Map<String, Object>> dailyIntervals = entry.getValue();
+            List<GenerationIntervalDto> dailyIntervals = entry.getValue();
 
             Map<String, Double> fuelSums = new LinkedHashMap<>();
 
-            for (String fuel : ALL_ENERGY_SOURCES) {
+            for (String fuel : EnergySource.getAllNames()) {
                 fuelSums.put(fuel, 0.0);
             }
 
             double cleanEnergySum = 0.0;
 
-            for (Map<String, Object> interval : dailyIntervals) {
-                List<Map<String, Object>> generationMix =
-                        (List<Map<String, Object>>) interval.get("generationmix");
-
+            for (GenerationIntervalDto interval : dailyIntervals) {
                 double cleanEnergyInInterval = 0.0;
 
-                for (Map<String, Object> source : generationMix) {
-                    String fuel = (String) source.get("fuel");
-                    Number percentageNumber = (Number) source.get("perc");
-                    double percentage = percentageNumber.doubleValue();
+                for (GenerationMixDto source : interval.getGenerationmix()) {
+                    String fuel = source.getFuel();
+                    double percentage = source.getPerc();
 
                     fuelSums.put(fuel, fuelSums.getOrDefault(fuel, 0.0) + percentage);
 
-                    if (CLEAN_ENERGY_SOURCES.contains(fuel)) {
+                    if (EnergySource.isCleanEnergySource(fuel)) {
                         cleanEnergyInInterval += percentage;
                     }
                 }
@@ -90,7 +82,7 @@ public class EnergyCalculator {
 
             Map<String, Double> averageGenerationMix = new LinkedHashMap<>();
 
-            for (String fuel : ALL_ENERGY_SOURCES) {
+            for (String fuel : EnergySource.getAllNames()) {
                 double average = dailyIntervals.isEmpty()
                         ? 0.0
                         : fuelSums.get(fuel) / dailyIntervals.size();
@@ -102,63 +94,37 @@ public class EnergyCalculator {
                     ? 0.0
                     : cleanEnergySum / dailyIntervals.size();
 
-            Map<String, Object> dayResult = new LinkedHashMap<>();
-
-            dayResult.put("date", date.toString());
-            dayResult.put("intervalCount", dailyIntervals.size());
-            dayResult.put("averageGenerationMix", averageGenerationMix);
-            dayResult.put("cleanEnergyPercent", round(cleanEnergyPercent));
+            DailyEnergyMixDto dayResult = new DailyEnergyMixDto(
+                    date.toString(),
+                    dailyIntervals.size(),
+                    averageGenerationMix,
+                    round(cleanEnergyPercent)
+            );
 
             days.add(dayResult);
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("days", days);
-
-        return result;
+        return new EnergyMixResponseDto(days);
     }
 
-    @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> prepareChargingIntervals(List<Map<String, Object>> intervals) {
-        List<Map<String, Object>> preparedIntervals = new ArrayList<>();
-
-        for (Map<String, Object> interval : intervals) {
-            List<Map<String, Object>> generationMix =
-                    (List<Map<String, Object>>) interval.get("generationmix");
-
-            double cleanEnergyPercent = calculateCleanEnergyPercent(generationMix);
-
-            Map<String, Object> preparedInterval = new LinkedHashMap<>();
-            preparedInterval.put("from", interval.get("from"));
-            preparedInterval.put("to", interval.get("to"));
-            preparedInterval.put("cleanEnergyPercent", cleanEnergyPercent);
-
-            preparedIntervals.add(preparedInterval);
-        }
-
-        preparedIntervals.sort(Comparator.comparing(interval ->
-                OffsetDateTime.parse((String) interval.get("from"))
-        ));
-
-        return preparedIntervals;
-    }
-
-    public Map<String, Object> findBestChargingWindow(
-            List<Map<String, Object>> preparedIntervals,
+    public Optional<ChargingWindowResponseDto> findBestChargingWindow(
+            List<GenerationIntervalDto> intervals,
             int hours,
             ZoneId londonZone
     ) {
-        int windowSize = hours * 2;
+        List<PreparedChargingInterval> preparedIntervals = prepareChargingIntervals(intervals);
+
+        int windowSize = hours * INTERVALS_PER_HOUR;
 
         if (preparedIntervals.size() < windowSize) {
-            return createError("Za mało danych do wyznaczenia okna ładowania.");
+            return Optional.empty();
         }
 
-        Map<String, Object> bestWindow = null;
-        double bestAverage = -1.0;
+        PreparedChargingWindow bestWindow = null;
+        double bestAverage = INITIAL_BEST_AVERAGE;
 
         for (int i = 0; i <= preparedIntervals.size() - windowSize; i++) {
-            List<Map<String, Object>> currentWindow =
+            List<PreparedChargingInterval> currentWindow =
                     preparedIntervals.subList(i, i + windowSize);
 
             if (!isWindowContinuous(currentWindow)) {
@@ -167,8 +133,8 @@ public class EnergyCalculator {
 
             double sum = 0.0;
 
-            for (Map<String, Object> interval : currentWindow) {
-                sum += (double) interval.get("cleanEnergyPercent");
+            for (PreparedChargingInterval interval : currentWindow) {
+                sum += interval.getCleanEnergyPercent();
             }
 
             double average = sum / currentWindow.size();
@@ -176,48 +142,67 @@ public class EnergyCalculator {
             if (average > bestAverage) {
                 bestAverage = average;
 
-                bestWindow = new LinkedHashMap<>();
-                bestWindow.put("start", currentWindow.get(0).get("from"));
-                bestWindow.put("end", currentWindow.get(currentWindow.size() - 1).get("to"));
-                bestWindow.put("averageCleanEnergyPercent", round(average));
+                bestWindow = new PreparedChargingWindow(
+                        currentWindow.get(0).getFrom(),
+                        currentWindow.get(currentWindow.size() - 1).getTo(),
+                        round(average)
+                );
             }
         }
 
         if (bestWindow == null) {
-            return createError("Nie znaleziono ciągłego okna ładowania.");
+            return Optional.empty();
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
+        ChargingWindowResponseDto response = new ChargingWindowResponseDto(
+                hours,
+                formatDateTimeForResponse(bestWindow.getStart(), londonZone),
+                formatDateTimeForResponse(bestWindow.getEnd(), londonZone),
+                bestWindow.getAverageCleanEnergyPercent(),
+                EnergySource.getCleanEnergyNames()
+        );
 
-        result.put("chargingWindowHours", hours);
-        result.put("start", formatDateTimeForResponse((String) bestWindow.get("start"), londonZone));
-        result.put("end", formatDateTimeForResponse((String) bestWindow.get("end"), londonZone));
-        result.put("averageCleanEnergyPercent", bestWindow.get("averageCleanEnergyPercent"));
-        result.put("cleanEnergySources", CLEAN_ENERGY_SOURCES);
-
-        return result;
+        return Optional.of(response);
     }
 
-    private double calculateCleanEnergyPercent(List<Map<String, Object>> generationMix) {
+    private List<PreparedChargingInterval> prepareChargingIntervals(List<GenerationIntervalDto> intervals) {
+        List<PreparedChargingInterval> preparedIntervals = new ArrayList<>();
+
+        for (GenerationIntervalDto interval : intervals) {
+            double cleanEnergyPercent = calculateCleanEnergyPercent(interval.getGenerationmix());
+
+            PreparedChargingInterval preparedInterval = new PreparedChargingInterval(
+                    interval.getFrom(),
+                    interval.getTo(),
+                    cleanEnergyPercent
+            );
+
+            preparedIntervals.add(preparedInterval);
+        }
+
+        preparedIntervals.sort(Comparator.comparing(interval ->
+                OffsetDateTime.parse(interval.getFrom())
+        ));
+
+        return preparedIntervals;
+    }
+
+    private double calculateCleanEnergyPercent(List<GenerationMixDto> generationMix) {
         double cleanEnergyPercent = 0.0;
 
-        for (Map<String, Object> source : generationMix) {
-            String fuel = (String) source.get("fuel");
-            Number percentageNumber = (Number) source.get("perc");
-            double percentage = percentageNumber.doubleValue();
-
-            if (CLEAN_ENERGY_SOURCES.contains(fuel)) {
-                cleanEnergyPercent += percentage;
+        for (GenerationMixDto source : generationMix) {
+            if (EnergySource.isCleanEnergySource(source.getFuel())) {
+                cleanEnergyPercent += source.getPerc();
             }
         }
 
         return cleanEnergyPercent;
     }
 
-    private boolean isWindowContinuous(List<Map<String, Object>> window) {
+    private boolean isWindowContinuous(List<PreparedChargingInterval> window) {
         for (int i = 1; i < window.size(); i++) {
-            String previousEnd = (String) window.get(i - 1).get("to");
-            String currentStart = (String) window.get(i).get("from");
+            String previousEnd = window.get(i - 1).getTo();
+            String currentStart = window.get(i).getFrom();
 
             if (!previousEnd.equals(currentStart)) {
                 return false;
@@ -233,13 +218,57 @@ public class EnergyCalculator {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
 
-    private Map<String, Object> createError(String message) {
-        Map<String, Object> error = new LinkedHashMap<>();
-        error.put("message", message);
-        return error;
+    private double round(double value) {
+        return Math.round(value * ROUNDING_FACTOR) / ROUNDING_FACTOR;
     }
 
-    private double round(double value) {
-        return Math.round(value * 100.0) / 100.0;
+    private static class PreparedChargingInterval {
+
+        private final String from;
+        private final String to;
+        private final double cleanEnergyPercent;
+
+        private PreparedChargingInterval(String from, String to, double cleanEnergyPercent) {
+            this.from = from;
+            this.to = to;
+            this.cleanEnergyPercent = cleanEnergyPercent;
+        }
+
+        public String getFrom() {
+            return from;
+        }
+
+        public String getTo() {
+            return to;
+        }
+
+        public double getCleanEnergyPercent() {
+            return cleanEnergyPercent;
+        }
+    }
+
+    private static class PreparedChargingWindow {
+
+        private final String start;
+        private final String end;
+        private final double averageCleanEnergyPercent;
+
+        private PreparedChargingWindow(String start, String end, double averageCleanEnergyPercent) {
+            this.start = start;
+            this.end = end;
+            this.averageCleanEnergyPercent = averageCleanEnergyPercent;
+        }
+
+        public String getStart() {
+            return start;
+        }
+
+        public String getEnd() {
+            return end;
+        }
+
+        public double getAverageCleanEnergyPercent() {
+            return averageCleanEnergyPercent;
+        }
     }
 }
