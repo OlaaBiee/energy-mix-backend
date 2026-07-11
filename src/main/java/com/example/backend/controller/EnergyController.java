@@ -1,5 +1,7 @@
 package com.example.backend.controller;
 
+import com.example.backend.dto.ChargingWindowResponseDto;
+import com.example.backend.dto.EnergyMixResponseDto;
 import com.example.backend.service.EnergyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -22,12 +24,12 @@ public class EnergyController {
     }
 
     @GetMapping("/energy-mix")
-    public Object getEnergyMix() {
+    public EnergyMixResponseDto getEnergyMix() {
         return energyService.getEnergyMix();
     }
 
     @GetMapping("/charging-window")
-    public Object getBestChargingWindow(@RequestParam int hours) {
+    public ChargingWindowResponseDto getBestChargingWindow(@RequestParam int hours) {
         return energyService.getBestChargingWindow(hours);
     }
 }

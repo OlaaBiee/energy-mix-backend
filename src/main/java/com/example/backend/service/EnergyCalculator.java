@@ -1,5 +1,6 @@
 package com.example.backend.service;
 
+
 import com.example.backend.dto.ChargingWindowResponseDto;
 import com.example.backend.dto.DailyEnergyMixDto;
 import com.example.backend.dto.EnergyMixResponseDto;
@@ -104,7 +105,7 @@ public class EnergyCalculator {
             days.add(dayResult);
         }
 
-        return new EnergyMixResponseDto(days);
+        return EnergyMixResponseDto.createNewResponse(days);
     }
 
     public Optional<ChargingWindowResponseDto> findBestChargingWindow(
@@ -154,7 +155,7 @@ public class EnergyCalculator {
             return Optional.empty();
         }
 
-        ChargingWindowResponseDto response = new ChargingWindowResponseDto(
+        ChargingWindowResponseDto response = ChargingWindowResponseDto.createNewResponse(
                 hours,
                 formatDateTimeForResponse(bestWindow.getStart(), londonZone),
                 formatDateTimeForResponse(bestWindow.getEnd(), londonZone),

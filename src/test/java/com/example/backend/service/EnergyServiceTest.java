@@ -1,8 +1,8 @@
 package com.example.backend.service;
 
 import com.example.backend.client.CarbonIntensityClient;
-import com.example.backend.dto.ApiErrorDto;
 import com.example.backend.dto.ChargingWindowResponseDto;
+import com.example.backend.dto.EnergyMixResponseDto;
 import com.example.backend.dto.GenerationIntervalDto;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -40,15 +39,11 @@ class EnergyServiceTest {
 
     @Test
     void shouldReturnErrorForInvalidChargingHours() {
-        Object result = energyService.getBestChargingWindow(0);
-
-        assertInstanceOf(ApiErrorDto.class, result);
-
-        ApiErrorDto error = (ApiErrorDto) result;
+        ChargingWindowResponseDto result = energyService.getBestChargingWindow(0);
 
         assertEquals(
                 "Charging time must be a full number of hours from 1 to 6.",
-                error.getMessage()
+                result.getErrorMessage()
         );
 
         verifyNoInteractions(carbonIntensityClient);
@@ -62,13 +57,9 @@ class EnergyServiceTest {
                 any(ZonedDateTime.class)
         )).thenReturn(Collections.emptyList());
 
-        Object result = energyService.getEnergyMix();
+        EnergyMixResponseDto result = energyService.getEnergyMix();
 
-        assertInstanceOf(ApiErrorDto.class, result);
-
-        ApiErrorDto error = (ApiErrorDto) result;
-
-        assertEquals("No data received from external API.", error.getMessage());
+        assertEquals("No data received from external API.", result.getErrorMessage());
 
         verify(energyCalculator, never()).calculateDailyEnergyMix(
                 anyList(),
@@ -84,7 +75,7 @@ class EnergyServiceTest {
         GenerationIntervalDto interval = new GenerationIntervalDto();
         List<GenerationIntervalDto> intervals = List.of(interval);
 
-        ChargingWindowResponseDto expectedResponse = new ChargingWindowResponseDto(
+        ChargingWindowResponseDto expectedResponse = ChargingWindowResponseDto.createNewResponse(
                 1,
                 "2026-01-01 01:00",
                 "2026-01-01 02:00",
@@ -103,7 +94,7 @@ class EnergyServiceTest {
                 any()
         )).thenReturn(Optional.of(expectedResponse));
 
-        Object result = energyService.getBestChargingWindow(1);
+        ChargingWindowResponseDto result = energyService.getBestChargingWindow(1);
 
         assertSame(expectedResponse, result);
     }
