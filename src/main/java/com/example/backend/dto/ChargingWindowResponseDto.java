@@ -1,7 +1,14 @@
 package com.example.backend.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class ChargingWindowResponseDto {
 
     private int chargingWindowHours;
@@ -9,38 +16,4 @@ public class ChargingWindowResponseDto {
     private String end;
     private double averageCleanEnergyPercent;
     private List<String> cleanEnergySources;
-
-    public ChargingWindowResponseDto(
-            int chargingWindowHours,
-            String start,
-            String end,
-            double averageCleanEnergyPercent,
-            List<String> cleanEnergySources
-    ) {
-        this.chargingWindowHours = chargingWindowHours;
-        this.start = start;
-        this.end = end;
-        this.averageCleanEnergyPercent = averageCleanEnergyPercent;
-        this.cleanEnergySources = cleanEnergySources;
-    }
-
-    public int getChargingWindowHours() {
-        return chargingWindowHours;
-    }
-
-    public String getStart() {
-        return start;
-    }
-
-    public String getEnd() {
-        return end;
-    }
-
-    public double getAverageCleanEnergyPercent() {
-        return averageCleanEnergyPercent;
-    }
-
-    public List<String> getCleanEnergySources() {
-        return cleanEnergySources;
-    }
 }

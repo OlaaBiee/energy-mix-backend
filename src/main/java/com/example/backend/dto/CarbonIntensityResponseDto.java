@@ -1,16 +1,11 @@
 package com.example.backend.dto;
 
+import lombok.Data;
+
 import java.util.List;
 
+@Data
 public class CarbonIntensityResponseDto {
 
     private List<GenerationIntervalDto> data;
-
-    public List<GenerationIntervalDto> getData() {
-        return data;
-    }
-
-    public void setData(List<GenerationIntervalDto> data) {
-        this.data = data;
-    }
 }
