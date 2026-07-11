@@ -36,13 +36,10 @@ Clean energy is calculated as the sum of:
 
 ### Test endpoint
 
-GET http://localhost:8080/api/test
 
 Returns a test message confirming that the backend is running.
 
 ### Energy mix endpoint
-
-GET http://localhost:8080/api/energy-mix
 
 Returns average energy mix data for three days: today, tomorrow and the day after tomorrow.
 
@@ -54,7 +51,6 @@ The response contains:
 
 ### Charging window endpoint
 
-GET http://localhost:8080/api/charging-window?hours=3
 
 The `hours` parameter must be a full number from 1 to 6.
 
@@ -63,9 +59,4 @@ The endpoint returns:
 - end date and time,
 - average clean energy percentage in the selected time window.
 
-## How to run the backend
 
-Go to the backend folder:
-
-```bash
-cd backend
