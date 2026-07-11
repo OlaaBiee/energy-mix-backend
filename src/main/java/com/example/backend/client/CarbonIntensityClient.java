@@ -2,6 +2,7 @@ package com.example.backend.client;
 
 import com.example.backend.dto.CarbonIntensityResponseDto;
 import com.example.backend.dto.GenerationIntervalDto;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -13,9 +14,10 @@ import java.util.Collections;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class CarbonIntensityClient {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     @Value("${carbon.intensity.api-url}")
     private String apiUrl;
